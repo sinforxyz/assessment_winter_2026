@@ -21,5 +21,17 @@ std::string FormatFahrenheit(double fahrenheit){
   snprintf(buffer, sizeof(buffer), "%.2f\n", fahrenheit);
   return std::string(buffer);
 }
+std::string SolveTemperature(const std::string &input, bool &ok) {
+    try {
+        double celsius = std::stod(input);
+        double fahrenheit = CelsiusToFahrenheit(celsius);
+        ok = true;
+        return FormatFahrenheit(fahrenheit);
+        
+    } catch (const std::exception&) {
+        ok = false;
+        return "";
+    }
+}
 
 }
