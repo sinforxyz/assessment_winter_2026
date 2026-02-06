@@ -31,17 +31,16 @@ std::string FormatFahrenheit(double fahrenheit){
   snprintf(buffer, sizeof(buffer), "%.2f\n", fahrenheit);
   return std::string(buffer);
 }
-std::string SolveTemperature(const std::string &input, bool &ok) {
-    try {
-        double celsius = std::stod(input);
-        double fahrenheit = CelsiusToFahrenheit(celsius);
-        ok = true;
-        return FormatFahrenheit(fahrenheit);
-        
-    } catch (const std::exception&) {
+std::string SolveTemperature(const std::string& input, bool& ok) {
+    std::istringstream in(input);
+    double celsius = 0.0;
+    if (!(in >> celsius)) {
         ok = false;
-        return "";
+        return {};
     }
+
+    ok = true;
+    return FormatFahrenheit(CelsiusToFahrenheit(celsius));
 }
 
 // ==================== A0-02 Leap Year ====================
@@ -70,26 +69,24 @@ std::string FormatLeapYearAnswer(bool is_leap_year){
 
 // Parses year from input, returns "YES\n" or "NO\n".
 // If parsing fails, ok=false and returns empty string.
-std::string SolveLeapYear(const std::string &input, bool &ok){
-  try {
-        int celsius = std::stod(input);
-        bool fahrenheit = IsLeapYear(celsius);
-        ok = true;
-        return FormatLeapYearAnswer(fahrenheit);
-        
-    } catch (const std::exception&) {
+std::string SolveLeapYear(const std::string& input, bool& ok) {
+    std::istringstream in(input);
+    int year = 0;
+    if (!(in >> year)) {
         ok = false;
-        return "";
+        return {};
     }
+
+    ok = true;
+    return FormatLeapYearAnswer(IsLeapYear(year));
 }
 
 
 // ==================== A0-03 Range Sum ====================
 // TODO: 完成下面函数的实现
 long long RangeSum(long long l, long long r) {
-    (void)l;
-    (void)r;
-    return 0;
+    if (l > r) return 0;
+    return (l + r) * (r - l + 1) / 2;
 }
 
 std::string SolveRangeSum(const std::string& input, bool& ok) {
