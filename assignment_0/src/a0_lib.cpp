@@ -21,50 +21,68 @@ namespace rm_a0 {
 
 // ==================== A0-01 Temperature ====================
 // TODO: 完成下面函数的实现
-double CelsiusToFahrenheit(double celsius) {
-    (void)celsius;
-    return 0.0;
-}
-// 这里是格式化输出的函数
-std::string FormatFahrenheit(double fahrenheit) {
-    (void)fahrenheit;
-    return {};
+
+double CelsiusToFahrenheit(double celsius){
+  return celsius*9.0/5.0+32.0;
 }
 
-std::string SolveTemperature(const std::string& input, bool& ok) {
-    std::istringstream in(input);
-    double celsius = 0.0;
-    if (!(in >> celsius)) {
+std::string FormatFahrenheit(double fahrenheit){
+  char buffer[64];
+  snprintf(buffer, sizeof(buffer), "%.2f\n", fahrenheit);
+  return std::string(buffer);
+}
+std::string SolveTemperature(const std::string &input, bool &ok) {
+    try {
+        double celsius = std::stod(input);
+        double fahrenheit = CelsiusToFahrenheit(celsius);
+        ok = true;
+        return FormatFahrenheit(fahrenheit);
+        
+    } catch (const std::exception&) {
         ok = false;
-        return {};
+        return "";
     }
-
-    ok = true;
-    return FormatFahrenheit(CelsiusToFahrenheit(celsius));
 }
 
 // ==================== A0-02 Leap Year ====================
 // TODO: 完成下面函数的实现
-bool IsLeapYear(int year) {
+bool IsLeapYear(int year){
+  if (year % 400 == 0) {
+    return true; 
+  } else if (year % 100 == 0) {
+    return false; 
+  } else if (year % 4 == 0) {
+    return true; 
+  } else {
     return false;
-}
-// TODO: 完成下面函数的实现,不要新增行数，只修改返回值
-std::string FormatLeapYearAnswer(bool is_leap_year) {
-    (void)is_leap_year;
-    return {};
+  }
 }
 
-std::string SolveLeapYear(const std::string& input, bool& ok) {
-    std::istringstream in(input);
-    int year = 0;
-    if (!(in >> year)) {
+std::string FormatLeapYearAnswer(bool is_leap_year){
+  std::string ok;
+  if(is_leap_year){
+    ok="YES\n";
+  }else{
+    ok="NO\n";
+  }
+  return ok;
+}
+
+// Parses year from input, returns "YES\n" or "NO\n".
+// If parsing fails, ok=false and returns empty string.
+std::string SolveLeapYear(const std::string &input, bool &ok){
+  try {
+        int celsius = std::stod(input);
+        bool fahrenheit = IsLeapYear(celsius);
+        ok = true;
+        return FormatLeapYearAnswer(fahrenheit);
+        
+    } catch (const std::exception&) {
         ok = false;
-        return {};
+        return "";
     }
-
-    ok = true;
-    return FormatLeapYearAnswer(IsLeapYear(year));
 }
+
 
 // ==================== A0-03 Range Sum ====================
 // TODO: 完成下面函数的实现

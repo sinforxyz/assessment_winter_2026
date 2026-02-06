@@ -13,3 +13,4 @@ std::string FormatFahrenheit(double fahrenheit);
 std::string SolveTemperature(const std::string &input, bool &ok);
 
 } // namespace rm_a0
+
