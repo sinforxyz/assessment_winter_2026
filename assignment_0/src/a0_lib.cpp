@@ -110,7 +110,12 @@ namespace {
 
         bool IsVowelChar(unsigned char c) {
             // TODO: 完成下面函数的实现
-            (void)c;
+            c=std::tolower(c);
+            char vowel[]={'a','e','i','o','u'};
+            for(int i=0;i<5;i++){
+                if(vowel[i]==c)
+                return true;
+            }
             return false;
         }
 
@@ -120,6 +125,10 @@ namespace {
 std::size_t CountVowels(const std::string& line) {
     std::size_t count = 0;
     // TODO: 完成下面函数的实现
+    for(char c:line){
+        if(a0_04_detail::IsVowelChar(c))
+        count++;
+    }
         
     return count;
 }
@@ -144,7 +153,37 @@ ScoreStatsResult ComputeScoreStats(const std::string& input, bool& ok) {
     std::istringstream in(input);
     // TODO: 完成下面函数的实现
 
-    return ScoreStatsResult{};
+    int n;
+    if (!(in >> n) || n <= 0) {
+        return ScoreStatsResult{};
+    }
+    
+    ScoreStatsResult result;
+    result.top_score = 0;
+    int total_score = 0;
+    
+    for (int i = 0; i < n; i++) {
+        std::string name;
+        int score;
+        
+        if (!(in >> name >> score)) {
+            return ScoreStatsResult{};
+        }
+        
+        if (score > result.top_score) {
+            result.top_score = score;
+            result.top_name = name;
+        }
+        
+        total_score += score;
+    }
+    
+    
+    
+    ok = true;
+    
+    result.avg = static_cast<double>(total_score) / n;
+    return result;
 }
 
 std::string SolveScoreStats(const std::string& input, bool& ok) {
@@ -179,6 +218,53 @@ private:
   std::vector<int> digits_;
 };
 */
+BigInt::BigInt(){
+    digits_.push_back(0);
+}
+BigInt::BigInt(const std::string &s){
+    if (s.empty()) {
+        digits_.push_back(0);
+        return;
+    }
+    for (int i = s.length() - 1; i >= 0; i--) {
+        char c = s[i];
+        if (c<'0'||c>'9') {
+            digits_.clear();
+            digits_.push_back(0);
+            return;
+        }
+        digits_.push_back(c - '0');
+    }
+    while (digits_.size() > 1 && digits_.back() == 0) {
+        digits_.pop_back();
+    }
+}
+BigInt operator+(const BigInt &a, const BigInt &b){
+    BigInt result;
+    result.digits_.clear();  
+    int carry = 0; 
+    int  i = 0;
+    
+    while (i < a.digits_.size()||i<b.digits_.size() || carry > 0) {
+        int digit_a = (i < a.digits_.size()) ? a.digits_[i] : 0;
+        int digit_b = (i < b.digits_.size()) ? b.digits_[i] : 0;
+        
+        int sum = digit_a + digit_b + carry;
+        result.digits_.push_back(sum % 10); 
+        carry = sum / 10;                     
+        
+        i++;
+    }
+    
+    return result;
+
+}
+std::ostream &operator<<(std::ostream &os, const BigInt &x){
+    for(int i=x.digits_.size()-1;i>=0;i--){
+        os<<x.digits_[i];
+    }
+    return os;
+}
 
 std::string SolveBigIntAdd(const std::string& input, bool& ok) {
     std::istringstream in(input);
@@ -193,6 +279,9 @@ std::string SolveBigIntAdd(const std::string& input, bool& ok) {
         ok = false;
         return {};
     }
+    BigInt A=BigInt(a);
+    BigInt B=BigInt(b);
+    out<<A+B<<"\n";
 
     ok = true;
     return out.str();
@@ -211,7 +300,41 @@ struct LogStats {
 };
 */
 LogStats AnalyzeLogFile(const std::string& path, bool& ok) {
-    return {};
+    ok=false;
+    LogStats log;
+
+    std::ifstream file(path);
+    if(!file.is_open()){
+        return log;
+    }
+    long long cnt=0;
+    std::string line;
+
+    while(std::getline(file,line)){
+        std::istringstream lines(line);
+        std::string level;
+        double ms;
+        lines>>level>>ms;
+        if(level=="INFO"){
+            log.info++;
+        }else if(level=="WARN"){
+            log.warn++;
+        }else if(level=="ERROR"){
+            log.error++;
+        }
+        log.avg_ms+=ms;
+        cnt++;
+        if(ms>log.max_ms){
+            log.max_ms=ms;
+            log.max_level=level;
+        }
+
+    }
+
+    log.avg_ms/=cnt;
+    file.close();
+    ok=true;
+    return log;
 }
 
 std::string SolveLogAnalyzer(const std::string& input, bool& ok) {
@@ -267,9 +390,64 @@ private:
   FILE *fp_ = nullptr;
 };
 */
+FileHandle::FileHandle(const char *path,const char *mode){
+    if(path&&mode)
+    fp_=std::fopen(path,mode);
+}
+FileHandle::~FileHandle(){
+    if(fp_){
+        std::fclose(fp_);
+    }
+}
+FileHandle::FileHandle(FileHandle&&other)noexcept:fp_(other.fp_){
+    other.fp_=nullptr;
+}
+FileHandle&FileHandle::operator=(FileHandle&&other)noexcept{
+    if(this!=&other){
+        if(fp_){
+            std::fclose(fp_);
+        }
+        fp_=other.fp_;
+        other.fp_=nullptr;
+    }
+    return *this;
+}
+bool FileHandle::valid()const{
+    return fp_!=nullptr;
+}
+FILE*FileHandle::get()const{
+    return fp_;
+}
 
 bool CopyFile(const std::string& in_path, const std::string& out_path) {
+    FileHandle in(in_path.c_str(),"rb");
+    if(!in.valid()){
+        return false;
+    }
+    FileHandle out(out_path.c_str(),"wb");
+    if(!out.valid()){
+        return false;
+    }
+    const size_t size=4096;
+    char buffer[size];
+    while(true){
+        size_t br=std::fread(buffer,1,size,in.get());
+        if(br==0){
+            if(std::feof(in.get())){
+                break;
+            }else{
+                return false;
+            }
+        }
 
+        size_t bw=std::fwrite(buffer,1,br,out.get());
+        if(bw!=br){
+            return false;
+        }
+    }
+    if(std::fflush(out.get())!=0){
+        return false;
+    }
     return true;
 }
 

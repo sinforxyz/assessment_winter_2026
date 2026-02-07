@@ -28,7 +28,7 @@ static std::string MakeTempPath() {
     close(fd);
     return std::string(buf.data());
 }
-
+                                
 TEST(A001Temperature, ConvertsAndFormats) {
     bool ok = false;
     EXPECT_EQ(rm_a0::SolveTemperature("0\n", ok), "32.00\n");

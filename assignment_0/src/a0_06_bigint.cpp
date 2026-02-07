@@ -9,6 +9,7 @@ int main() {
 
   bool ok = false;
   std::string out = rm_a0::SolveBigIntAdd(oss.str(), ok);
+  std::cout << out; 
   if (!ok) {
     return 0;
   }
