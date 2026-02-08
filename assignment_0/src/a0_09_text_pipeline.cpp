@@ -22,3 +22,4 @@ int main() {
   for (const auto& s : out) std::cout << s << "\n";
   return 0;
 }
+

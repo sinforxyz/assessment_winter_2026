@@ -469,14 +469,258 @@ std::string SolveRaiiCopy(const std::string& input, bool& ok) {
     return "FAIL\n";
 }
 
-// ==================== A0-09 Text Pipeline====================
+// ==================== A0-09 Text Pipeline================
 
-std::vector<std::string> RunTextPipeline(const std::string& pipeline, const std::vector<std::string>& lines, bool& ok) {
-    (void)pipeline;
-    (void)lines;
-    ok = false;
-    return {};
+
+
+class TextProcessor {
+public:
+    virtual ~TextProcessor() {}
+    virtual std::string process(const std::string& input) = 0;
+};
+class ProcessorFactory {
+public:
+    virtual ~ProcessorFactory() {}
+    virtual TextProcessor* create(const std::vector<std::string>& args) = 0;
+};
+class TrimProcessor : public TextProcessor {
+public:
+    std::string process(const std::string& input) override {
+        if (input.empty()) return "";
+        
+        size_t start = 0;
+        size_t end = input.size();
+        while (start < end && std::isspace(static_cast<unsigned char>(input[start]))) {
+            ++start;
+        }
+        while (end > start && std::isspace(static_cast<unsigned char>(input[end - 1]))) {
+            --end;
+        }
+        
+        return input.substr(start, end - start);
+    }
+};
+
+class TrimFactory : public ProcessorFactory {
+public:
+    TextProcessor* create(const std::vector<std::string>& args) override {
+        if (!args.empty()) {
+            return nullptr;
+        }
+        return new TrimProcessor();
+    }
+};
+class UpperProcessor : public TextProcessor {
+public:
+    std::string process(const std::string& input) override {
+        std::string result = input;
+        for (char& c : result) {
+            if (c >= 'a' && c <= 'z') {
+                c = c - 'a' + 'A';
+            }
+        }
+        return result;
+    }
+};
+
+class UpperFactory : public ProcessorFactory {
+public:
+    TextProcessor* create(const std::vector<std::string>& args) override {
+        if (!args.empty()) {
+            return nullptr;
+        }
+        return new UpperProcessor();
+    }
+};
+class ReplaceProcessor : public TextProcessor {
+    std::string from_;
+    std::string to_;
+    
+public:
+    ReplaceProcessor(const std::string& from, const std::string& to) 
+        : from_(from), to_(to) {}
+    
+    std::string process(const std::string& input) override {
+        if (from_.empty()) return input;
+        
+        std::string result;
+        size_t start = 0;
+        size_t found = input.find(from_);
+        
+        while (found != std::string::npos) {
+            result.append(input, start, found - start);
+            result.append(to_);
+            start = found + from_.size();
+            found = input.find(from_, start);
+        }
+        
+        result.append(input, start, input.size() - start);
+        return result;
+    }
+};
+
+class ReplaceFactory : public ProcessorFactory {
+public:
+    TextProcessor* create(const std::vector<std::string>& args) override {
+        if (args.size() != 2) {
+            return nullptr;
+        }
+        return new ReplaceProcessor(args[0], args[1]);
+    }
+};
+class ProcessorRegistry {
+private:
+    struct FactoryEntry {
+        std::string name;
+        ProcessorFactory* factory;
+    };
+    
+    std::vector<FactoryEntry> registry_;
+    
+    ProcessorRegistry() {
+        registry_.push_back({"trim", new TrimFactory()});
+        registry_.push_back({"upper", new UpperFactory()});
+        registry_.push_back({"replace", new ReplaceFactory()});
+    }
+    
+    ~ProcessorRegistry() {
+        for (auto& entry : registry_) {
+            delete entry.factory;
+        }
+    }
+    
+public:
+    ProcessorRegistry(const ProcessorRegistry&) = delete;
+    ProcessorRegistry& operator=(const ProcessorRegistry&) = delete;
+    
+    static ProcessorRegistry& instance() {
+        static ProcessorRegistry reg;
+        return reg;
+    }
+    
+    TextProcessor* create(const std::string& name, 
+                          const std::vector<std::string>& args) {
+        for (const auto& entry : registry_) {
+            if (entry.name == name) {
+                return entry.factory->create(args);
+            }
+        }
+        return nullptr;
+    }
+    
+    bool hasProcessor(const std::string& name) const {
+        for (const auto& entry : registry_) {
+            if (entry.name == name) {
+                return true;
+            }
+        }
+        return false;
+    }
+};
+
+struct PipelineStep {
+    std::string name;
+    std::vector<std::string> args;
+};
+
+std::vector<PipelineStep> ParsePipeline(const std::string& pipeline_str, bool& ok) {
+    std::vector<PipelineStep> steps;
+    std::istringstream ss(pipeline_str);
+    std::string token;
+    
+    while (std::getline(ss, token, '|')) {
+        if (token.empty()) {
+            ok = false;
+            return {};
+        }
+        size_t colon_pos = token.find(':');
+        PipelineStep step;
+        
+        if (colon_pos == std::string::npos) {
+            step.name = token;
+        } else {
+            step.name = token.substr(0, colon_pos);
+            
+            std::string args_str = token.substr(colon_pos + 1);
+            std::istringstream args_ss(args_str);
+            std::string arg;
+            
+            while (std::getline(args_ss, arg, ':')) {
+                step.args.push_back(arg);
+            }
+        }
+        
+        steps.push_back(step);
+    }
+    
+    ok = true;
+    return steps;
 }
+void CleanupProcessors(std::vector<TextProcessor*>& processors) {
+    for (auto* processor : processors) {
+        delete processor;
+    }
+    processors.clear();
+}
+
+
+
+
+std::vector<std::string> RunTextPipeline(const std::string& pipeline, 
+                                         const std::vector<std::string>& lines, 
+                                         bool& ok) {
+    
+    auto& registry = ProcessorRegistry::instance();
+    
+    bool parse_ok = false;
+    auto steps = ParsePipeline(pipeline, parse_ok);
+    if (!parse_ok || steps.empty()) {
+        ok = false;
+        return {};
+    }
+    
+    // 创建处理器链（使用裸指针）
+    std::vector<TextProcessor*> processors;
+    
+    for (const auto& step : steps) {
+        if (!registry.hasProcessor(step.name)) {
+            CleanupProcessors(processors);
+            ok = false;
+            return {};
+        }
+        
+        TextProcessor* processor = registry.create(step.name, step.args);
+        if (!processor) {
+            CleanupProcessors(processors);
+            ok = false;
+            return {};
+        }
+        
+        processors.push_back(processor);
+    }
+    
+    // 处理每一行
+    std::vector<std::string> results;
+    results.reserve(lines.size());
+    
+    for (const auto& line : lines) {
+        std::string processed = line;
+        
+        // 依次应用每个处理器
+        for (auto* processor : processors) {
+            processed = processor->process(processed);
+        }
+        
+        results.push_back(processed);
+    }
+    
+    // 清理处理器
+    CleanupProcessors(processors);
+    
+    ok = true;
+    return results;
+}
+
 
 // ==================== A0-10 Rule Engine ====================
 

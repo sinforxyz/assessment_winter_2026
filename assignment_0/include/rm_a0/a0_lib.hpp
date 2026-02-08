@@ -7,6 +7,7 @@
 namespace rm_a0 {
 
 // A0-09
+
 std::vector<std::string> RunTextPipeline(const std::string& pipeline,
                                         const std::vector<std::string>& lines,
                                         bool& ok);
