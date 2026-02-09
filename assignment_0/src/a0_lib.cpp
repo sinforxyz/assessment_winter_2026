@@ -476,7 +476,6 @@ class processors{
   virtual ~processors(){};
   virtual std::string process(std::string input)=0; 
 };
-
 class Trim:public processors{
     public:
     std::string process(std::string input)override{
@@ -546,6 +545,44 @@ void cleanprocessor(std::vector<processors*>&processor){
     }
     processor.clear();
 };
+
+
+//工厂出发
+class ProcessorFactory{
+public:
+    virtual ~ProcessorFactory(){}
+    virtual processors* create(const std::vector<std::string>& args) = 0;
+};
+class TrimFactory:public ProcessorFactory{
+public:
+    processors* create(const std::vector<std::string>& args)override {
+        if(!args.empty()){
+            return nullptr;
+        }
+        return new Trim();
+    }
+};
+class UpperFactory : public ProcessorFactory {
+public:
+    processors* create(const std::vector<std::string>& args)override {
+        if(!args.empty()){
+            return nullptr;
+        }
+        return new Upper();
+    }
+};
+class ReplaceFactory : public ProcessorFactory {
+public:
+    processors* create(const std::vector<std::string>& args)override {
+        if (args.size() != 2){
+            return nullptr;
+        }
+        return new Replace(args[0],args[1]);
+    }
+};
+
+
+
 //注册表部分
 class Register{
     public:
@@ -557,10 +594,10 @@ class Register{
         return reg;
     }
 
-    processors* create(const std::string&name,const std::vector<std::string>&args){
-        for(registerentry entry:registry){
-            if(entry.name==name){
-                return entry.creator(args);
+    processors* create(const std::string& name, const std::vector<std::string>& args) {
+        for (const auto& entry : registry) {
+            if (entry.name == name) {
+                return entry.factory->create(args);
             }
         }
         return nullptr;
@@ -570,39 +607,21 @@ class Register{
     private:
     struct registerentry{
         std::string name;
-        processors* (*creator)(const std::vector<std::string>&);
+        ProcessorFactory* factory; 
     };
     std::vector<registerentry> registry;
 
     Register(){
-        registry.push_back({"trim", trim});
-        registry.push_back({"upper",upper});
-        registry.push_back({"replace",replace});
-
+        registry.push_back({"trim", new TrimFactory()});
+        registry.push_back({"upper", new UpperFactory()});
+        registry.push_back({"replace", new ReplaceFactory()});
     }
-    
-    
-    private:    
-    static processors* trim(const std::vector<std::string>& args) {
-        if (!args.empty()) {
-            return nullptr; 
+    ~Register(){ 
+        for (auto& entry : registry) {
+            delete entry.factory;
         }
-        return new Trim();
     }
     
-    static processors* upper(const std::vector<std::string>& args) {
-        if (!args.empty()) {
-            return nullptr; 
-        }
-        return new Upper();
-    }
-    
-    static processors* replace(const std::vector<std::string>& args) {
-        if (args.size() != 2) {
-            return nullptr; 
-        }
-        return new Replace(args[0], args[1]);
-    }
 };
 
 //流水线部分
