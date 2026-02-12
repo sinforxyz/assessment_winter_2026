@@ -703,17 +703,226 @@ std::vector<std::string> RunTextPipeline(const std::string& pipeline, const std:
 
 // ==================== A0-10 Rule Engine ====================
 
+//处理器
+class IRule{
+    public:
+    virtual ~IRule()=default;
+    virtual bool match(const Event& event)=0;
+};
+
+class Level:public IRule{
+    public:
+    Level(std::string spec){
+        if(spec=="INFO")
+        level=0;
+        else if(spec=="WARN")
+        level=1;
+        else if(spec=="ERROR")
+        level=2;
+        else
+        level=-1;
+    }
+    bool match(const Event& event)override{
+        int elevel;
+        if(event.level=="INFO")
+        elevel=0;
+        else if(event.level=="WARN")
+        elevel=1;
+        else if(event.level=="ERROR")
+        elevel=2;
+        else
+        return false;
+        return elevel>=level;
+    }
+    private:
+    int level;
+};
+
+class Ms:public IRule{
+    public:
+    Ms(std::string spec){
+        threshold=std::stoll(spec);
+    }
+    bool match(const Event& event)override{
+        return event.ms>threshold;
+    }
+    private:
+    long long threshold;
+};
+
+class Contain:public IRule{
+    public:
+    Contain(std::string spec):substr(spec){}
+    bool match(const Event& event)override{
+        return event.msg.find(substr)!=std::string::npos;
+    }
+    private:
+    std::string substr;
+};
+
+void cleanIRules(std::vector<IRule*>&Rules){
+    for(auto*rule:Rules){
+        delete rule;
+    }
+    Rules.clear();
+};
+
+//工厂
+class RuleFactory{
+    public:
+    virtual IRule* create(const std::string& spec) = 0;
+    virtual ~RuleFactory() = default;
+};
+
+class LevelFactory : public RuleFactory {
+    public:
+    IRule* create(const std::string& spec) override {
+        if(spec!="INFO"&&spec!="WARN"&&spec!="ERROR"){
+            return nullptr;
+        }
+        return new Level(spec);
+    }
+};
+
+class MsFactory : public RuleFactory {
+    public:
+    IRule* create(const std::string& spec) override {
+        if(spec.empty()){
+            return nullptr;
+        }
+        for(char c:spec){
+            if(!std::isdigit(c)){
+                return nullptr;
+            }
+        }
+        try{
+            return new Ms(spec);
+        }catch(...){
+            return nullptr;
+        }
+    };
+};
+
+class ContainsFactory : public RuleFactory {
+    public:
+    IRule* create(const std::string& spec) override {
+        if(spec.empty()){
+            return nullptr;
+        }
+        return new Contain(spec);
+    }
+};
+
+//注册表
+class RuleRegister{
+    public:
+    RuleRegister(const RuleRegister&)=delete;
+    RuleRegister&operator=(const RuleRegister&)=delete;
+
+    static RuleRegister& instance(){
+        static RuleRegister reg;
+        return reg;
+    }
+
+    IRule* create(const std::string& name,const std::string& spec){
+        for(const auto& entry:registry){
+            if(entry.name==name){
+                return entry.factory->create(spec);
+            }
+        }
+        return nullptr;
+    }
+
+    private:
+    struct registerentry{
+        std::string name;
+        RuleFactory* factory;
+    };
+    std::vector<registerentry> registry;
+
+    RuleRegister(){
+        registry.push_back({"level",new LevelFactory()});
+        registry.push_back({"ms",new MsFactory()});
+        registry.push_back({"msg_contains",new ContainsFactory()});
+    }
+    ~RuleRegister(){
+        for(auto& entry:registry){
+            delete entry.factory;
+        }
+    }
+};
+
+
+std::pair<std::string,std::string> parserule(const std::string& line){
+    if(line.find("level>=")==0){
+        return {"level",line.substr(7)};
+    }
+    if(line.find("ms>")==0){
+        return {"ms",line.substr(3)};
+    }
+    if(line.find("msg_contains:")==0){
+        return {"msg_contains",line.substr(14)};
+    }
+    return {"unknown",line};
+}
+
+
+
+
+
+
+
 std::vector<long long> RunRuleEngine(
     const std::vector<std::string>& rule_specs,
     const std::vector<Event>& events,
     long long& total_any,
     bool& ok
 ) {
-    (void)rule_specs;
-    (void)events;
-    total_any = 0;
-    ok        = false;
-    return {};
+    RuleRegister& registry=RuleRegister::instance();
+    std::vector<IRule*> rulelist;
+    std::vector<long long> hit_counts(rule_specs.size(),0);
+    
+    //创建规则对象
+    for(const auto& spec:rule_specs){
+        auto [name,param]=parserule(spec);
+        
+        if(name=="unknown"){
+            cleanIRules(rulelist);
+            ok=false;
+            total_any=0;
+            return {};
+        }
+        
+        IRule* rule=registry.create(name,param);
+        if(!rule){
+            cleanIRules(rulelist);
+            ok=false;
+            total_any=0;
+            return {};
+        }
+        rulelist.push_back(rule);
+    }
+    
+    //匹配事件
+    total_any=0;
+    for(const auto& event:events){
+        bool hit_any=false;
+        
+        for(size_t i=0;i<rulelist.size();i++){
+            if(rulelist[i]->match(event)){
+                hit_counts[i]++;
+                hit_any=true;
+            }
+        }
+        
+        if(hit_any){
+            total_any++;
+        }
+    }
+    
+    cleanIRules(rulelist);
+    ok=true;
+    return hit_counts;
 }
 
 // ==================== A0-11 Command Dispatcher====================
