@@ -38,7 +38,7 @@ uint16_t Crc16Ccitt(const uint8_t* data, size_t len) {
   // 参数：poly=0x1021, init=0xFFFF。
   // CRC 必须覆盖 version..payload 这些字节（即 SOF 之后、crc16 之前的全部内容）。
   // 单元测试依赖这一点。
-  uint8_t crc=0xFFFF;
+  uint16_t crc=0xFFFF;
   for(int i=0;i<len;i++){
     uint8_t byte=data[i];
     uint16_t temp=static_cast<uint16_t>(byte)<<8;
@@ -79,7 +79,8 @@ std::vector<uint8_t> Encode(const Frame& f) {
   out.insert(out.end(), f.payload.begin(), f.payload.end());
 
   // TODO: 替换为真实的 CRC。
-  AppendLe16(out, 0);
+  uint16_t crc = Crc16Ccitt(out.data() + 2, out.size() - 2);
+  AppendLe16(out, crc);
   return out;
 }
 
@@ -151,3 +152,4 @@ std::string ToHex(const std::vector<uint8_t>& bytes) {
 }
 
 }  // namespace rmproto
+
