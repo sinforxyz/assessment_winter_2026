@@ -91,9 +91,37 @@ bool TryDecode(std::vector<uint8_t>& buffer, Frame& out) {
   // - 必须搜索 SOF（0xA5 0x5A）来重新同步。
   // - 若不足以组成完整帧：返回 false，并保持 buffer 不变。
   // - 若候选帧 CRC 错误 / 长度非法：丢弃部分字节并继续搜索（必须避免死循环）。
-  // - 成功时：填充 out，从 buffer 中擦除已消费的字节，并返回 true。
-  (void)buffer;
-  (void)out;
+  // - 成功时：填充 out，从 buffer 中擦除已消费的字节，并返回 true。  
+  size_t i=0;
+  while(i+4<=buffer.size()){
+    if(buffer[i]!=kSof0&&buffer[i+1]!=kSof1){
+      i++;
+      continue;
+    }
+
+    uint16_t payloadlen=ReadLe16(buffer,i+3);
+    if(payloadlen>1024){
+      i++;
+      continue;
+    }
+
+    size_t framelen=2+1+2+2+1+payloadlen+2;
+    if(i+framelen>buffer.size()){
+      return false;
+    }
+    uint16_t crccalc=Crc16Ccitt(buffer.data()+i+2,framelen-4);
+    uint16_t crcrecv=ReadLe16(buffer,i+framelen-2);
+    if(crccalc==crcrecv){
+      out.version=buffer[i+2];
+      out.seq=ReadLe16(buffer,i+5);
+      out.type=buffer[i+7];
+      out.payload.assign(buffer.begin()+i+8,buffer.begin()+i+8+payloadlen);
+      buffer.erase(buffer.begin(),buffer.begin()+i+framelen);
+      return true;
+    }else{
+      i++;
+    }
+  }
   return false;
 }
 
@@ -152,4 +180,6 @@ std::string ToHex(const std::vector<uint8_t>& bytes) {
 }
 
 }  // namespace rmproto
+
+
 
