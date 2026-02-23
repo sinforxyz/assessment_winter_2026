@@ -94,7 +94,7 @@ bool TryDecode(std::vector<uint8_t>& buffer, Frame& out) {
   // - 成功时：填充 out，从 buffer 中擦除已消费的字节，并返回 true。  
   size_t i=0;
   while(i+4<=buffer.size()){
-    if(buffer[i]!=kSof0&&buffer[i+1]!=kSof1){
+    if(buffer[i]!=kSof0||buffer[i+1]!=kSof1){
       i++;
       continue;
     }
